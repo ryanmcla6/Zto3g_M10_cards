@@ -1,0 +1,6 @@
+set auto_update 0
+set automatic_html_opening False
+set auto_convert_model True
+set lhapdf_py3 /cvmfs/cms.cern.ch/el9_amd64_gcc11/external/lhapdf/6.4.0-a1eec6e5fc67bd79ff44968065caf8fe/share/LHAPDF/../../bin/lhapdf-config
+set run_mode 2
+save options --all

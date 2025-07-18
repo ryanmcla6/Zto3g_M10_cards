@@ -1,0 +1,215 @@
+import xml.etree.ElementTree as ET
+import ROOT
+import numpy as np
+
+lhe_file = "Events/run_01/unweighted_events.lhe"
+
+tree = ET.parse(lhe_file)
+root = tree.getroot()
+
+photons = []
+zs = []
+alps = []
+
+for event in root.findall("event"):
+    lines = event.text.strip().split("\n")
+    
+    header = lines[0].split()
+    num_particles = int(header[0])
+
+    if num_particles != 7:
+        continue
+
+    phs = []
+    zs_temp = []
+    alps_temp = []
+    
+    for i in range(num_particles):
+        data = lines[i + 1].split()
+        pdg_id = int(data[0])
+        status = int(data[1])           
+        px = float(data[6])
+        py = float(data[7])
+        pz = float(data[8])
+        E = float(data[9])
+        m = float(data[10])
+
+        if pdg_id == 22:
+            phs = [E, px, py, pz]
+            photons.append(phs)
+        elif pdg_id == 9000005:
+            alps_temp = [E, px, py, pz]
+        elif pdg_id == 23:
+            zs_temp = [E, px, py, pz]
+        #if i == 2 and pdg_id != 23:
+        #    print(f"Particle {i+1}: PDG ID={pdg_id}, E={E}, px={px}, py={py}, pz={pz}, m={m}")
+        #print(zs_temp)
+        
+    zs.append(zs_temp)
+    alps.append(alps_temp)
+
+low3 = 80
+high3 = 100
+low2 = 0
+high2 = 20
+
+binwidth = 0.25
+
+nbins3 = round((high3 - low3) / binwidth)
+nbins2 = round((high2 - low2) / binwidth)
+
+p2_h = ROOT.TH1F("2p_inv_mass", "2p_inv_mass", nbins2, low2, high2)
+p3_h = ROOT.TH1F("3p_inv_mass", "3p_inv_mass", nbins3, low3, high3)
+
+z_h = ROOT.TH1F("z_inv_mass", "z_inv_mass", nbins3, low3, high3)
+alp_h = ROOT.TH1F("alp_inv_mass", "alp_inv_mass", nbins2, low2, high2)
+
+enz = 0
+enalp = 0
+en2 = 0
+en3 = 0
+zps = np.zeros(3)
+alpps = np.zeros(3)
+ps3 = np.zeros(3)
+ps2 = np.zeros(3)
+
+for i in range(len(photons)):
+    if i != 0 and i % 3 == 0:
+        p2 = np.linalg.norm(ps2)
+        p3 = np.linalg.norm(ps3)
+
+        m2 = np.sqrt(en2**2 - p2**2)
+        m3 = np.sqrt(en3**2 - p3**2)
+        
+        
+        p2_h.Fill(m2)
+        p3_h.Fill(m3)
+        
+        en2 = 0
+        en3 = 0
+        ps3 = np.zeros(3)
+        ps2 = np.zeros(3)
+    if i < len(zs):
+        enz = zs[i][0]
+        zps = np.array(zs[i][1:4])
+        enalp = alps[i][0]
+        alpps = np.array(alps[i][1:4])
+        
+        en3 += photons[i][0]
+        ps3 = ps3 + np.array(photons[i][1:4])
+        
+        zp = np.linalg.norm(zps)
+        alpp = np.linalg.norm(alpps)
+
+        zm = np.sqrt(enz**2 - zp**2)
+        alpm = np.sqrt(enalp**2 - alpp**2)
+
+        #print(enz)
+        #print(zp)
+        #print(zm, '\n')
+        z_h.Fill(zm)
+        alp_h.Fill(alpm)
+
+        enz = 0
+        enalp = 0
+        zps = np.zeros(3)
+        alpps = np.zeros(3)
+
+    if i % 3 != 0:
+        en2 += photons[i][0]
+        ps2 = ps2 + np.array(photons[i][1:4])
+    
+ROOT.gStyle.SetOptStat(0)
+
+c1 = ROOT.TCanvas("c1", "c1", 800, 600)
+c1 = c1.cd()
+c1.SetLogy()
+
+p2_h.SetLineColor(1)
+p2_h.SetMarkerColor(1)
+p2_h.SetMarkerSize(0.5)
+p2_h.SetMarkerStyle(20)
+p2_h.GetXaxis().SetTitle("Invariant Mass (GeV / c^2)")
+p2_h.SetTitle("2-Photon Invariant Mass")
+p2_h.GetXaxis().SetRangeUser(low2, high2)
+p2_h.GetYaxis().SetRangeUser(0.1, 2*10**3)
+p2_h.GetYaxis().SetTitle("Counts")
+#h_lg[ch].SetMaximum(1.5*max(maximums))
+#h_lg[ch].SetMaximum(nevents)
+p2_h.Draw("ehist")
+#h_lg[ch].SaveAs("h_lgch"+chlist_str[ch]+"_Run"+str(sys.argv[1]).replace(".txt","")+".root")
+
+#legend = TLegend(0.55,0.55,0.8,0.8)
+#legend.AddEntry(h_lg[ch],"Ch. "+chlist_str[ch]+" (Run "+str(sys.argv[1])+")","ep")
+#legend.Draw("same")
+c1.SaveAs("2photon_inv_mass.jpg")
+
+c2 = ROOT.TCanvas("c2", "c2", 800, 600)
+c2 = c2.cd()
+c2.SetLogy()
+
+p3_h.SetLineColor(1)
+p3_h.SetMarkerColor(1)
+p3_h.SetMarkerSize(0.5)
+p3_h.SetMarkerStyle(20)
+p3_h.GetXaxis().SetTitle("Invariant Mass (GeV / c^2)")
+p3_h.SetTitle("3-Photon Invariant Mass")
+p3_h.GetXaxis().SetRangeUser(low3, high3)
+p3_h.GetYaxis().SetRangeUser(0.1, 2*10**3)
+p3_h.GetYaxis().SetTitle("Counts")
+#h_lg[ch].SetMaximum(1.5*max(maximums))
+#h_lg[ch].SetMaximum(nevents)
+p3_h.Draw("ehist")
+#h_lg[ch].SaveAs("h_lgch"+chlist_str[ch]+"_Run"+str(sys.argv[1]).replace(".txt","")+".root")
+
+#legend = TLegend(0.55,0.55,0.8,0.8)
+#legend.AddEntry(h_lg[ch],"Ch. "+chlist_str[ch]+" (Run "+str(sys.argv[1])+")","ep")
+#legend.Draw("same")
+c2.SaveAs("3photon_inv_mass.jpg")
+
+
+c3 = ROOT.TCanvas("c3", "c3", 800, 600)
+c3 = c3.cd()
+c3.SetLogy()
+
+z_h.SetLineColor(1)
+z_h.SetMarkerColor(1)
+z_h.SetMarkerSize(0.5)
+z_h.SetMarkerStyle(20)
+z_h.GetXaxis().SetTitle("Invariant Mass (GeV / c^2)")
+z_h.SetTitle("Z Invariant Mass")
+z_h.GetXaxis().SetRangeUser(low3, high3)
+z_h.GetYaxis().SetRangeUser(0.1, 10**3)
+z_h.GetYaxis().SetTitle("Counts")
+#h_lg[ch].SetMaximum(1.5*max(maximums))
+#h_lg[ch].SetMaximum(nevents)
+z_h.Draw("ehist")
+#h_lg[ch].SaveAs("h_lgch"+chlist_str[ch]+"_Run"+str(sys.argv[1]).replace(".txt","")+".root")
+
+#legend = TLegend(0.55,0.55,0.8,0.8)
+#legend.AddEntry(h_lg[ch],"Ch. "+chlist_str[ch]+" (Run "+str(sys.argv[1])+")","ep")
+#legend.Draw("same")
+c3.SaveAs("z_inv_mass.jpg")
+
+c4 = ROOT.TCanvas("c4", "c4", 800, 600)
+c4 = c4.cd()
+c4.SetLogy()
+
+alp_h.SetLineColor(1)
+alp_h.SetMarkerColor(1)
+alp_h.SetMarkerSize(0.5)
+alp_h.SetMarkerStyle(20)
+alp_h.GetXaxis().SetTitle("Invariant Mass (GeV / c^2)")
+alp_h.SetTitle("ALP Invariant Mass")
+alp_h.GetXaxis().SetRangeUser(low2, high2)
+alp_h.GetYaxis().SetRangeUser(0.1, 10**3)
+alp_h.GetYaxis().SetTitle("Counts")
+#h_lg[ch].SetMaximum(1.5*max(maximums))
+#h_lg[ch].SetMaximum(nevents)
+alp_h.Draw("ehist")
+#h_lg[ch].SaveAs("h_lgch"+chlist_str[ch]+"_Run"+str(sys.argv[1]).replace(".txt","")+".root")
+
+#legend = TLegend(0.55,0.55,0.8,0.8)
+#legend.AddEntry(h_lg[ch],"Ch. "+chlist_str[ch]+" (Run "+str(sys.argv[1])+")","ep")
+#legend.Draw("same")
+c4.SaveAs("alp_inv_mass.jpg")
